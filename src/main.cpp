@@ -1,6 +1,8 @@
 #include <WiFi.h>
 #include <PubSubClient.h>
 
+#include "secrets.h" // Include the secrets file for WiFi and MQTT credentials
+
 // ESP32 Control Pins for MUX
 const int pinS0 = 2;
 const int pinS1 = 4;
@@ -30,7 +32,7 @@ const int pairs[NUM_PAIRS][2] = {
 bool turnedOn[NUM_PAIRS] = { 0 };
 
 // Network and MQTT variables
-const char* mqtt_server = "YOUR_MQTT_BROKER_IP"; // Change this to your MQTT broker's IP address
+const char* mqtt_server = SECRET_MQTT_IP; // Change this to your MQTT broker's IP address
 const char* mqtt_topic = "parking/slots";
 
 WiFiClient espClient;
@@ -40,7 +42,7 @@ void setup() {
   Serial.begin(115200); // Baud rate for ESP32
 
   // Connect to WiFi
-  WiFi.begin("Wokwi-GUEST", "", 6);
+  WiFi.begin(SECRET_SSID, SECRET_PASS, 6);
   while (WiFi.status() != WL_CONNECTED) {
     delay(100);
     Serial.println("Trying to connect to WiFi...");
