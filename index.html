@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Parking Dashboard</title>
+    <!-- Tailwind CSS for premium styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- The ROCK-SOLID Paho MQTT CDN Link -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js" type="text/javascript"></script>
+</head>
+<body class="bg-gray-900 text-white font-sans min-h-screen p-8">
+
+    <div class="max-w-6xl mx-auto">
+        <!-- Header -->
+        <header class="mb-8 flex justify-between items-end border-b border-gray-700 pb-4">
+            <div>
+                <h1 class="text-4xl font-bold tracking-tight text-gray-100">Parking Command Center</h1>
+                <p class="text-gray-400 mt-2">Live ultrasonic sensor telemetry</p>
+            </div>
+            <div id="status-badge" class="px-4 py-2 rounded-full font-semibold text-sm bg-gray-800 text-gray-400 border border-gray-700 flex items-center gap-2 transition-colors duration-300">
+                <div id="status-dot" class="w-3 h-3 rounded-full bg-gray-500"></div>
+                <span id="status-text">Connecting to Broker...</span>
+            </div>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            
+            <!-- Left Side: Parking Grid -->
+            <div class="lg:col-span-2 bg-gray-800 p-8 rounded-2xl shadow-2xl border border-gray-700">
+                <h2 class="text-xl font-semibold mb-6 text-gray-300">Live Bay Status</h2>
+                
+                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                    <!-- Parking Slots -->
+                    <!-- IDs MUST match your ESP32 JSON payload exact keys -->
+                    <div id="slot_1" class="h-40 rounded-xl flex flex-col items-center justify-center border-2 border-gray-600 bg-gray-700 text-gray-400 transition-all duration-300">
+                        <span class="text-2xl font-bold">P1</span>
+                        <span class="text-xs uppercase tracking-widest mt-2 status-label">Offline</span>
+                    </div>
+                    <div id="slot_2" class="h-40 rounded-xl flex flex-col items-center justify-center border-2 border-gray-600 bg-gray-700 text-gray-400 transition-all duration-300">
+                        <span class="text-2xl font-bold">P2</span>
+                        <span class="text-xs uppercase tracking-widest mt-2 status-label">Offline</span>
+                    </div>
+                    <div id="slot_3" class="h-40 rounded-xl flex flex-col items-center justify-center border-2 border-gray-600 bg-gray-700 text-gray-400 transition-all duration-300">
+                        <span class="text-2xl font-bold">P3</span>
+                        <span class="text-xs uppercase tracking-widest mt-2 status-label">Offline</span>
+                    </div>
+                    <div id="slot_4" class="h-40 rounded-xl flex flex-col items-center justify-center border-2 border-gray-600 bg-gray-700 text-gray-400 transition-all duration-300">
+                        <span class="text-2xl font-bold">P4</span>
+                        <span class="text-xs uppercase tracking-widest mt-2 status-label">Offline</span>
+                    </div>
+                    <div id="slot_5" class="h-40 rounded-xl flex flex-col items-center justify-center border-2 border-gray-600 bg-gray-700 text-gray-400 transition-all duration-300">
+                        <span class="text-2xl font-bold">P5</span>
+                        <span class="text-xs uppercase tracking-widest mt-2 status-label">Offline</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Side: History Log -->
+            <div class="bg-gray-800 p-6 rounded-2xl shadow-2xl border border-gray-700 flex flex-col h-[400px] lg:h-auto">
+                <h2 class="text-xl font-semibold mb-4 text-gray-300 flex justify-between items-center">
+                    Activity Log
+                    <span class="text-xs font-normal text-gray-500">Most recent top</span>
+                </h2>
+                
+                <div id="log-container" class="flex-1 overflow-y-auto pr-2 space-y-3">
+                    <!-- Log entries will be injected here via JavaScript -->
+                    <div class="text-sm text-gray-500 italic text-center mt-10">Waiting for sensor data...</div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // --- CONFIGURATION ---
+        // Changed from "localhost" to avoid Windows IPv6 resolution issues
+        // If this still fails, use your exact 192.168.X.X IP address here!
+        const mqtt_server = "127.0.0.1"; 
+        const mqtt_port = 9001; // WebSockets port configured in Mosquitto
+        const mqtt_topic = "parking/slots";
+
+        // Generate a random client ID
+        const clientID = "WebDash_" + Math.random().toString(16).substr(2, 8);
+        
+        // Initialize the Paho Client (This will now work!)
+        const client = new Paho.MQTT.Client(mqtt_server, mqtt_port, clientID);
+
+        // --- UI HELPER FUNCTIONS ---
+        function updateSlotUI(slotId, status) {
+            const slot = document.getElementById(slotId);
+            if (!slot) return;
+
+            const label = slot.querySelector('.status-label');
+
+            if (status === "occupied") {
+                // Red theme
+                slot.className = "h-40 rounded-xl flex flex-col items-center justify-center border-2 border-red-500 bg-red-900/30 text-red-400 transition-all duration-300 shadow-[0_0_15px_rgba(239,68,68,0.2)]";
+                label.innerText = "Occupied";
+            } else if (status === "free") {
+                // Green theme
+                slot.className = "h-40 rounded-xl flex flex-col items-center justify-center border-2 border-emerald-500 bg-emerald-900/30 text-emerald-400 transition-all duration-300 shadow-[0_0_15px_rgba(16,185,129,0.2)]";
+                label.innerText = "Available";
+            }
+        }
+
+        function addLogEntry(slotId, status) {
+            const logContainer = document.getElementById('log-container');
+            
+            // Remove the "Waiting for data" placeholder if it exists
+            const placeholder = logContainer.querySelector('.italic');
+            if (placeholder) placeholder.remove();
+
+            // Create timestamp
+            const now = new Date();
+            const timeString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+            // Format the slot name nicely (e.g., "slot_1" -> "Slot 1")
+            const prettySlotName = slotId.replace('_', ' ').toUpperCase();
+
+            // Create the log element
+            const logEl = document.createElement('div');
+            logEl.className = "bg-gray-700/50 p-3 rounded-lg flex justify-between items-center text-sm border-l-4 " + 
+                              (status === 'occupied' ? 'border-red-500' : 'border-emerald-500');
+            
+            logEl.innerHTML = `
+                <div>
+                    <span class="font-bold text-gray-200">${prettySlotName}</span>
+                    <span class="text-gray-400 ml-2">${status === 'occupied' ? 'Vehicle Arrived' : 'Vehicle Departed'}</span>
+                </div>
+                <div class="text-xs text-gray-500">${timeString}</div>
+            `;
+
+            // Insert at the top
+            logContainer.prepend(logEl);
+
+            // Keep the log from growing infinitely (keep last 50 items)
+            if (logContainer.children.length > 50) {
+                logContainer.lastChild.remove();
+            }
+        }
+
+        // --- MQTT CALLBACKS ---
+        client.onConnectionLost = function (responseObject) {
+            console.error("Connection Lost:", responseObject.errorMessage);
+            
+            // Update Status Badge
+            const badge = document.getElementById("status-badge");
+            badge.className = "px-4 py-2 rounded-full font-semibold text-sm bg-red-900/30 text-red-400 border border-red-800 flex items-center gap-2";
+            document.getElementById("status-text").innerText = "Disconnected";
+            document.getElementById("status-dot").className = "w-3 h-3 rounded-full bg-red-500 animate-pulse";
+            
+            // Set all slots to gray/offline
+            document.querySelectorAll('.status-label').forEach(el => el.innerText = "Offline");
+            const slots = ['slot_1', 'slot_2', 'slot_3', 'slot_4', 'slot_5'];
+            slots.forEach(id => {
+                const el = document.getElementById(id);
+                if(el) el.className = "h-40 rounded-xl flex flex-col items-center justify-center border-2 border-gray-600 bg-gray-700 text-gray-400 transition-all duration-300";
+            });
+        };
+
+        client.onMessageArrived = function (message) {
+            try {
+                const data = JSON.parse(message.payloadString);
+                
+                // data looks like: { "slot_1": "occupied" }
+                for (const key in data) {
+                    const status = data[key];
+                    updateSlotUI(key, status);
+                    addLogEntry(key, status);
+                }
+            } catch (e) {
+                console.error("Failed to parse JSON payload", e);
+            }
+        };
+
+        // --- CONNECT TO BROKER ---
+        const options = {
+            timeout: 3,
+            onSuccess: function () {
+                console.log("Connected to MQTT Broker!");
+                
+                // Update Status Badge
+                const badge = document.getElementById("status-badge");
+                badge.className = "px-4 py-2 rounded-full font-semibold text-sm bg-emerald-900/30 text-emerald-400 border border-emerald-800 flex items-center gap-2";
+                document.getElementById("status-text").innerText = "Live";
+                document.getElementById("status-dot").className = "w-3 h-3 rounded-full bg-emerald-500";
+                
+                // Subscribe to topic
+                client.subscribe(mqtt_topic);
+                
+                // Initialize all slots to green (free) when first connected
+                const slots = ['slot_1', 'slot_2', 'slot_3', 'slot_4', 'slot_5'];
+                slots.forEach(id => updateSlotUI(id, "free"));
+            },
+            onFailure: function (message) {
+                console.error("Connection failed: " + message.errorMessage);
+                document.getElementById("status-text").innerText = "Connection Failed";
+                document.getElementById("status-dot").className = "w-3 h-3 rounded-full bg-red-500";
+            }
+        };
+
+        // Start connection
+        client.connect(options);
+    </script>
+</body>
+</html>
