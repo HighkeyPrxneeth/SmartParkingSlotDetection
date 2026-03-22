@@ -161,14 +161,14 @@
       "id": "text1",
       "top": -1065.6,
       "left": -556.8,
-      "attrs": { "text": "Parking Slot #1" }
+      "attrs": { "text": "Parking Slot #5" }
     },
     {
       "type": "wokwi-text",
       "id": "text2",
       "top": -787.2,
       "left": -556.8,
-      "attrs": { "text": "Parking Slot #2" }
+      "attrs": { "text": "Parking Slot #4" }
     },
     {
       "type": "wokwi-text",
@@ -182,28 +182,28 @@
       "id": "text4",
       "top": -230.4,
       "left": -556.8,
-      "attrs": { "text": "Parking Slot #4" }
+      "attrs": { "text": "Parking Slot #2" }
     },
     {
       "type": "wokwi-text",
       "id": "text5",
       "top": 38.4,
       "left": -556.8,
-      "attrs": { "text": "Parking Slot #5" }
+      "attrs": { "text": "Parking Slot #1" }
     },
     {
       "type": "wokwi-text",
       "id": "text6",
       "top": 748.8,
       "left": -76.8,
-      "attrs": { "text": "Indicator #5" }
+      "attrs": { "text": "Indicator #1" }
     },
     {
       "type": "wokwi-text",
       "id": "text7",
       "top": 748.8,
       "left": 28.8,
-      "attrs": { "text": "Indicator #4" }
+      "attrs": { "text": "Indicator #2" }
     },
     {
       "type": "wokwi-text",
@@ -217,14 +217,14 @@
       "id": "text9",
       "top": 748.8,
       "left": 240,
-      "attrs": { "text": "Indicator #2" }
+      "attrs": { "text": "Indicator #4" }
     },
     {
       "type": "wokwi-text",
       "id": "text10",
       "top": 748.8,
       "left": 345.6,
-      "attrs": { "text": "Indicator #1" }
+      "attrs": { "text": "Indicator #5" }
     }
   ],
   "connections": [
