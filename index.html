@@ -15,8 +15,8 @@
         <!-- Header -->
         <header class="mb-8 flex justify-between items-end border-b border-gray-700 pb-4">
             <div>
-                <h1 class="text-4xl font-bold tracking-tight text-gray-100">Parking Command Center</h1>
-                <p class="text-gray-400 mt-2">Live ultrasonic sensor telemetry</p>
+                <h1 class="text-4xl font-bold tracking-tight text-gray-100">Parking Dashboard</h1>
+                <p class="text-gray-400 mt-2">Live telemetry</p>
             </div>
             <div id="status-badge" class="px-4 py-2 rounded-full font-semibold text-sm bg-gray-800 text-gray-400 border border-gray-700 flex items-center gap-2 transition-colors duration-300">
                 <div id="status-dot" class="w-3 h-3 rounded-full bg-gray-500"></div>
@@ -24,10 +24,10 @@
             </div>
         </header>
 
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-stretch">
             
             <!-- Left Side: Parking Grid -->
-            <div class="lg:col-span-2 bg-gray-800 p-8 rounded-2xl shadow-2xl border border-gray-700">
+            <div id="live-bay-panel" class="lg:col-span-2 bg-gray-800 p-8 rounded-2xl shadow-2xl border border-gray-700">
                 <h2 class="text-xl font-semibold mb-6 text-gray-300">Live Bay Status</h2>
                 
                 <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
@@ -57,13 +57,19 @@
             </div>
 
             <!-- Right Side: History Log -->
-            <div class="bg-gray-800 p-6 rounded-2xl shadow-2xl border border-gray-700 flex flex-col h-[400px] lg:h-auto">
+            <div id="activity-log-panel" class="bg-gray-800 p-6 rounded-2xl shadow-2xl border border-gray-700 flex flex-col overflow-hidden">
                 <h2 class="text-xl font-semibold mb-4 text-gray-300 flex justify-between items-center">
                     Activity Log
-                    <span class="text-xs font-normal text-gray-500">Most recent top</span>
+                    <div class="flex items-center gap-3">
+                        <button id="enable-disk-save-btn" class="text-xs font-semibold px-3 py-1 rounded-md bg-gray-700 hover:bg-gray-600 text-gray-200 border border-gray-600 transition-colors duration-200">
+                            Enable Disk Auto-Save
+                        </button>
+                        <span id="disk-save-status" class="text-xs font-normal text-amber-400">Disk save: off</span>
+                        <span class="text-xs font-normal text-gray-500">Most recent top</span>
+                    </div>
                 </h2>
                 
-                <div id="log-container" class="flex-1 overflow-y-auto pr-2 space-y-3">
+                <div id="log-container" class="flex-1 min-h-0 overflow-y-auto pr-2 space-y-3">
                     <!-- Log entries will be injected here via JavaScript -->
                     <div class="text-sm text-gray-500 italic text-center mt-10">Waiting for sensor data...</div>
                 </div>
@@ -79,12 +85,153 @@
         const mqtt_server = "127.0.0.1"; 
         const mqtt_port = 9001; // WebSockets port configured in Mosquitto
         const mqtt_topic = "parking/slots";
+        const csv_storage_key = "parking_activity_log_rows_v1";
+        const csv_file_name = "parking_activity_log.csv";
+        const csv_rows = [];
+        let csvFileHandle = null;
 
         // Generate a random client ID
         const clientID = "WebDash_" + Math.random().toString(16).substr(2, 8);
         
         // Initialize the Paho Client (This will now work!)
         const client = new Paho.MQTT.Client(mqtt_server, mqtt_port, clientID);
+
+        function escapeCsvValue(value) {
+            const text = String(value ?? "");
+            if (/[",\n]/.test(text)) {
+                return '"' + text.replace(/"/g, '""') + '"';
+            }
+            return text;
+        }
+
+        function buildCsvContent() {
+            const header = "timestamp,slot,status,event";
+            const rows = csv_rows.map(row => {
+                return [
+                    escapeCsvValue(row.timestamp),
+                    escapeCsvValue(row.slot),
+                    escapeCsvValue(row.status),
+                    escapeCsvValue(row.event)
+                ].join(",");
+            });
+            return [header, ...rows].join("\n");
+        }
+
+        function persistCsvRows() {
+            try {
+                localStorage.setItem(csv_storage_key, JSON.stringify(csv_rows));
+                localStorage.setItem(csv_storage_key + "_csv", buildCsvContent());
+            } catch (e) {
+                console.warn("Failed to persist CSV rows", e);
+            }
+        }
+
+        function updateAutoSaveUi(isEnabled) {
+            const autoSaveButton = document.getElementById("enable-disk-save-btn");
+            const autoSaveStatus = document.getElementById("disk-save-status");
+            if (!autoSaveButton || !autoSaveStatus) return;
+
+            if (isEnabled) {
+                autoSaveButton.innerText = "Disk Auto-Save Enabled";
+                autoSaveButton.className = "text-xs font-semibold px-3 py-1 rounded-md bg-emerald-800 hover:bg-emerald-700 text-emerald-100 border border-emerald-700 transition-colors duration-200";
+                autoSaveStatus.innerText = "Disk save: on (" + csv_rows.length + ")";
+                autoSaveStatus.className = "text-xs font-normal text-emerald-400";
+            } else {
+                autoSaveButton.innerText = "Enable Disk Auto-Save";
+                autoSaveButton.className = "text-xs font-semibold px-3 py-1 rounded-md bg-gray-700 hover:bg-gray-600 text-gray-200 border border-gray-600 transition-colors duration-200";
+                autoSaveStatus.innerText = "Disk save: off";
+                autoSaveStatus.className = "text-xs font-normal text-amber-400";
+            }
+        }
+
+        function loadSavedCsvRows() {
+            try {
+                const savedRows = localStorage.getItem(csv_storage_key);
+                if (!savedRows) return;
+
+                const parsedRows = JSON.parse(savedRows);
+                if (!Array.isArray(parsedRows)) return;
+
+                parsedRows.forEach(row => csv_rows.push(row));
+            } catch (e) {
+                console.warn("Failed to load CSV rows", e);
+            }
+        }
+
+        function saveRowToCsv(row) {
+            csv_rows.push(row);
+            persistCsvRows();
+            updateAutoSaveUi(!!csvFileHandle);
+
+            if (csvFileHandle) {
+                flushCsvToDisk().catch(err => {
+                    console.warn("Failed to auto-write CSV to disk", err);
+                    csvFileHandle = null;
+                    updateAutoSaveUi(false);
+                });
+            }
+        }
+
+        async function flushCsvToDisk() {
+            if (!csvFileHandle) return;
+            const writable = await csvFileHandle.createWritable();
+            await writable.write(buildCsvContent() + "\n");
+            await writable.close();
+        }
+
+        async function enableDiskAutoSave() {
+            if (!window.showSaveFilePicker) {
+                console.warn("File System Access API is not available in this browser.");
+                return;
+            }
+
+            try {
+                const handle = await window.showSaveFilePicker({
+                    suggestedName: csv_file_name,
+                    types: [
+                        {
+                            description: "CSV file",
+                            accept: { "text/csv": [".csv"] }
+                        }
+                    ]
+                });
+
+                const permission = await handle.requestPermission({ mode: "readwrite" });
+                if (permission !== "granted") {
+                    updateAutoSaveUi(false);
+                    return;
+                }
+
+                csvFileHandle = handle;
+                await flushCsvToDisk();
+                updateAutoSaveUi(true);
+            } catch (e) {
+                // User cancelled file picker or browser blocked access.
+                console.warn("Disk auto-save was not enabled", e);
+                updateAutoSaveUi(false);
+            }
+        }
+
+        function syncLogPanelHeight() {
+            const liveBayPanel = document.getElementById("live-bay-panel");
+            const activityLogPanel = document.getElementById("activity-log-panel");
+            if (!liveBayPanel || !activityLogPanel) return;
+
+            // Keep equal heights when panels are side-by-side.
+            if (window.innerWidth >= 1024) {
+                activityLogPanel.style.height = liveBayPanel.offsetHeight + "px";
+            } else {
+                // On stacked mobile layout, keep natural height.
+                activityLogPanel.style.height = "auto";
+            }
+        }
+
+        loadSavedCsvRows();
+        updateAutoSaveUi(false);
+        document.getElementById("enable-disk-save-btn")?.addEventListener("click", enableDiskAutoSave);
+        window.addEventListener("resize", syncLogPanelHeight);
+        window.addEventListener("load", syncLogPanelHeight);
+        syncLogPanelHeight();
 
         // --- UI HELPER FUNCTIONS ---
         function updateSlotUI(slotId, status) {
@@ -114,6 +261,7 @@
             // Create timestamp
             const now = new Date();
             const timeString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            const eventLabel = status === 'occupied' ? 'Vehicle Arrived' : 'Vehicle Departed';
 
             // Format the slot name nicely (e.g., "slot_1" -> "Slot 1")
             const prettySlotName = slotId.replace('_', ' ').toUpperCase();
@@ -126,7 +274,7 @@
             logEl.innerHTML = `
                 <div>
                     <span class="font-bold text-gray-200">${prettySlotName}</span>
-                    <span class="text-gray-400 ml-2">${status === 'occupied' ? 'Vehicle Arrived' : 'Vehicle Departed'}</span>
+                    <span class="text-gray-400 ml-2">${eventLabel}</span>
                 </div>
                 <div class="text-xs text-gray-500">${timeString}</div>
             `;
@@ -138,6 +286,14 @@
             if (logContainer.children.length > 50) {
                 logContainer.lastChild.remove();
             }
+
+            // Save every new activity row so it can be exported as CSV.
+            saveRowToCsv({
+                timestamp: now.toISOString(),
+                slot: prettySlotName,
+                status: status,
+                event: eventLabel
+            });
         }
 
         // --- MQTT CALLBACKS ---

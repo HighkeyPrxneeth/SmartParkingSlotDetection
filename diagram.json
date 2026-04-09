@@ -16,7 +16,7 @@
       "top": 6.5,
       "left": -449.3,
       "rotate": 270,
-      "attrs": { "distance": "363" }
+      "attrs": { "distance": "400" }
     },
     {
       "type": "wokwi-hc-sr04",
@@ -24,7 +24,7 @@
       "top": 5.1,
       "left": -728.7,
       "rotate": 90,
-      "attrs": { "distance": "20" }
+      "attrs": { "distance": "400" }
     },
     {
       "type": "wokwi-hc-sr04",
@@ -32,7 +32,7 @@
       "top": -262.3,
       "left": -449.3,
       "rotate": 270,
-      "attrs": { "distance": "117" }
+      "attrs": { "distance": "400" }
     },
     {
       "type": "wokwi-hc-sr04",
@@ -40,7 +40,7 @@
       "top": -263.7,
       "left": -728.7,
       "rotate": 90,
-      "attrs": { "distance": "33" }
+      "attrs": { "distance": "400" }
     },
     {
       "type": "wokwi-hc-sr04",
@@ -48,7 +48,7 @@
       "top": -550.3,
       "left": -449.3,
       "rotate": 270,
-      "attrs": {}
+      "attrs": { "distance": "400" }
     },
     {
       "type": "wokwi-hc-sr04",
@@ -56,7 +56,7 @@
       "top": -551.7,
       "left": -728.7,
       "rotate": 90,
-      "attrs": {}
+      "attrs": { "distance": "400" }
     },
     {
       "type": "wokwi-hc-sr04",
@@ -64,7 +64,7 @@
       "top": -819.1,
       "left": -449.3,
       "rotate": 270,
-      "attrs": {}
+      "attrs": { "distance": "400" }
     },
     {
       "type": "wokwi-hc-sr04",
@@ -72,7 +72,7 @@
       "top": -820.5,
       "left": -728.7,
       "rotate": 90,
-      "attrs": {}
+      "attrs": { "distance": "400" }
     },
     {
       "type": "wokwi-hc-sr04",
@@ -80,7 +80,7 @@
       "top": -1097.5,
       "left": -449.3,
       "rotate": 270,
-      "attrs": { "distance": "33" }
+      "attrs": { "distance": "400" }
     },
     {
       "type": "wokwi-hc-sr04",
@@ -88,7 +88,7 @@
       "top": -1098.9,
       "left": -728.7,
       "rotate": 90,
-      "attrs": { "distance": "30" }
+      "attrs": { "distance": "400" }
     },
     {
       "type": "board-cd74hc4067",
